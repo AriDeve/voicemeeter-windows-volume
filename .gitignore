@@ -14,3 +14,7 @@ settings.json
 /.idea/inspectionProfiles/Project_Default.xml
 /.idea/vcs.xml
 /.idea/voicemeeter-windows-volume.iml
+
+# [epiq]: local hydrated state is never committed
+.epiq/events/
+.epiq/log/
