@@ -60,9 +60,56 @@ If you want to see nerdy console output, follow these steps:
 -   [Mineral](https://github.com/Mineral)
     -   Inspiration for handling "Automatically Start With Windows" through powershell instead of .vbs files
 
-# Building From Source
+# Bun Development Setup (Windows x64)
 
-## Requirements
+Dependency installation and native-module loading have been verified with Bun 1.4.4. Node.js is not needed for this workflow. Run these commands from the repository root:
+
+```powershell
+bun --bun install --frozen-lockfile
+```
+
+Keep `bun.lock`: it preserves the existing dependency versions and the pinned `voicemeeter-connector` commit. The old Git-package integrity values in `package-lock.json` were removed only for that connector because they do not match GitHub's source archive; Bun records its own archive integrity in `bun.lock`. Registry-package integrity checks remain enabled.
+
+If an earlier installation left a partial dependency tree, reinstall the locked packages without deleting the repository or unrelated files:
+
+```powershell
+bun --bun install --frozen-lockfile --force
+```
+
+`--bun` forces lifecycle JavaScript to run with Bun. Do not use `--ignore-scripts` as an installation workaround. The Windows x64 prebuilds supplied by `ffi-napi` and `ref-napi` work with Bun; no Python/compiler installation or native source rebuild was needed. Bun may report two blocked `core-js` postinstalls; those print donation banners, not native build steps.
+
+Verify real native calls and load the installed Voicemeeter DLL without logging in or changing volume:
+
+```powershell
+@'
+const assert = require("node:assert/strict");
+const ref = require("ref-napi");
+const ffi = require("ffi-napi");
+assert.equal(ref.alloc("int", 42).deref(), 42);
+const kernel = ffi.Library("kernel32", { GetCurrentProcessId: ["uint32", []] });
+assert.equal(kernel.GetCurrentProcessId(), process.pid);
+console.log("Native PID:", process.pid, "Bun:", process.versions.bun);
+require("voicemeeter-connector").Voicemeeter.init()
+    .then(() => console.log("Voicemeeter DLL loaded"))
+    .catch(error => { console.error(error); process.exitCode = 1; });
+'@ | bun --no-install -
+```
+
+Voicemeeter must be installed for the DLL initialization check. This checks native loading, not an active mixer connection, tray interaction, or audio synchronization.
+
+To launch the source directly with Bun, bypassing the legacy package scripts:
+
+```powershell
+bun --no-install ./src/index.js
+```
+
+The launch command runs the actual tray application and can change audio according to its settings. Full tray/audio behavior has not been verified by the dependency smoke checks.
+
+# Legacy Release Packaging
+
+The existing release-packaging scripts still target a bundled Node.js executable and invoke npm internally. They are not a Bun-only build workflow and were not exercised as part of Bun dependency setup.
+
+## Legacy Requirements
 
 -   [NodeJS](https://nodejs.org/) _(Currently on 16.19.0)_
 -   [Python v3.6-v3.9](https://www.python.org/downloads/) _(Ensure the python binary and scripts folder are in the system PATH variable)_
@@ -73,10 +120,6 @@ If you want to see nerdy console output, follow these steps:
 
 Once you have the above tools installed as described, you will need to reboot your computer.
 
-## Commands
+## Packaging Commands
 
--   `npm install` _Installs dependencies_
--   `npm run build` _Builds the projects into the \_dist folder_
--   `npm run rebuild` _Triggers a full rebuild of the node binary, including any changes made to the exe details_
-
-Please refer to package.json for the complete list of commands.
+See `package.json` for the existing `build` and `rebuild` scripts. They create the `_dist` release artifacts, but require the legacy toolchain above; invoking them through Bun does not remove their internal npm calls or the Node.js binary build.
